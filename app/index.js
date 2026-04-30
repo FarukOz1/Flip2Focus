@@ -1,407 +1,276 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useCallback, useRef, useState } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  Platform,
-  Vibration,
-} from "react-native";
-import { Accelerometer } from "expo-sensors";
-import * as Haptics from "expo-haptics";
-import { StatusBar } from "expo-status-bar";
-import { Timer, RotateCcw, Plus, Minus } from "lucide-react-native";
+  View, Text, StyleSheet, ScrollView,
+  Platform, Animated, StatusBar, TouchableOpacity,
+} from 'react-native';
 
-export default function FlipToFocus() {
-  const [timeLeft, setTimeLeft] = useState(25 * 60);
-  const [initialTime, setInitialTime] = useState(25 * 60);
-  const [timerState, setTimerState] = useState("idle");
-  const [isFaceDown, setIsFaceDown] = useState(false);
-  const [sensorData, setSensorData] = useState({ x: 0, y: 0, z: 0 });
+import { Colors } from '../constants/colors';
+import { useSessionStore } from '../store/sessionStore';
+import { useFlipDetector } from '../hooks/useFlipDetector';
+import { useTimer } from '../hooks/useTimer';
+import { useNotifications, sendSessionCompleteNotification } from '../hooks/useNotifications';
+import { PhoneCard } from '../components/PhoneCard';
+import { DurationSelector } from '../components/DurationSelector';
+import { SessionControls } from '../components/SessionControls';
+import { StatsRow } from '../components/StatsRow';
+import { SessionLog } from '../components/SessionLog';
+import { XPStore } from '../components/XPStore';
+import { FocusScreen } from '../components/FocusScreen';       // tap modu
+import { FlipFocusMode } from '../components/FlipFocusMode';   // flip modu
 
-  const timerRef = useRef(null);
-  const previousFaceDownRef = useRef(false);
-  const hasCompletedRef = useRef(false);
-
-  useEffect(() => {
-    let subscription = null;
-
-    const setupAccelerometer = async () => {
-      if (Platform.OS === "web") {
-        console.log("Accelerometer not available on web");
-        return;
+const triggerHaptic = async (type = 'medium') => {
+  try {
+    const Haptics = require('expo-haptics');
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      if (type === 'success') {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else if (type === 'warning') {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } else {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
+    }
+  } catch (_) {}
+};
 
-      try {
-        await Accelerometer.setUpdateInterval(500);
+export default function HomeScreen() {
+  const isFlipped        = useSessionStore((s) => s.isFlipped);
+  const isRunning        = useSessionStore((s) => s.isRunning);
+  const isPaused         = useSessionStore((s) => s.isPaused);
+  const selectedDuration = useSessionStore((s) => s.selectedDuration);
+  const remainingSeconds = useSessionStore((s) => s.remainingSeconds);
+  const elapsedSeconds   = useSessionStore((s) => s.elapsedSeconds);
+  const sessionNumber    = useSessionStore((s) => s.sessionNumber);
+  const totalFocusedToday = useSessionStore((s) => s.totalFocusedToday);
+  const sessionsToday    = useSessionStore((s) => s.sessionsToday);
+  const totalXPToday     = useSessionStore((s) => s.totalXPToday);
+  const totalXP          = useSessionStore((s) => s.totalXP);
+  const spentXP          = useSessionStore((s) => s.spentXP);
+  const streak           = useSessionStore((s) => s.streak);
+  const sessionLog       = useSessionStore((s) => s.sessionLog);
+  const startSession     = useSessionStore((s) => s.startSession);
+  const endSession       = useSessionStore((s) => s.endSession);
+  const togglePause      = useSessionStore((s) => s.togglePause);
+  const setDuration      = useSessionStore((s) => s.setDuration);
 
-        subscription = Accelerometer.addListener((data) => {
-          setSensorData(data);
+  const availableXP = totalXP - spentXP;
 
-          const newFaceDown = data.z < -0.5;
-          const faceUp = data.z > 0.3;
+  // Hangi modda? 'none' | 'tap' | 'flip'
+  const [focusMode, setFocusMode] = useState('none');
+  const [storeVisible, setStoreVisible] = useState(false);
 
-          if (newFaceDown && !previousFaceDownRef.current) {
-            setIsFaceDown(true);
-            previousFaceDownRef.current = true;
-          } else if (faceUp && previousFaceDownRef.current) {
-            setIsFaceDown(false);
-            previousFaceDownRef.current = false;
-          }
-        });
-      } catch (err) {
-        console.error("Accelerometer error:", err);
-      }
-    };
+  useNotifications({ isRunning, elapsedSeconds });
 
-    setupAccelerometer();
+  // Toast
+  const toastAnim    = useRef(new Animated.Value(0)).current;
+  const toastMsg     = useRef('');
+  const toastTimeout = useRef(null);
 
-    return () => {
-      if (subscription) {
-        subscription.remove();
-      }
-    };
-  }, []);
+  const showToast = useCallback((msg) => {
+    toastMsg.current = msg;
+    clearTimeout(toastTimeout.current);
+    Animated.spring(toastAnim, { toValue: 1, useNativeDriver: true, friction: 8 }).start();
+    toastTimeout.current = setTimeout(() => {
+      Animated.timing(toastAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+    }, 3000);
+  }, [toastAnim]);
 
-  useEffect(() => {
-    if (isFaceDown) {
-      setTimerState((prevState) => {
-        if (prevState === "running") {
-          console.log("Pausing timer (flipped face down)");
-          triggerHaptic();
-          return "paused";
-        }
-        return prevState;
-      });
+  // Tamamlandı
+  const handleComplete = useCallback(() => {
+    const result = endSession(true);
+    triggerHaptic('success');
+    setFocusMode('none');
+    showToast('Session tamamlandı! +' + result.xp + ' XP 🎯');
+    sendSessionCompleteNotification(result.xp);
+  }, [endSession, showToast]);
+
+  // Bitirildi
+  const handleEnd = useCallback(() => {
+    const result = endSession(false);
+    triggerHaptic('warning');
+    setFocusMode('none');
+    if (result.tooShort) {
+      showToast('Çok kısa! En az 1 dakika odaklan.');
     } else {
-      setTimerState((prevState) => {
-        if (prevState === "idle" || prevState === "paused") {
-          console.log("Starting timer (flipped face up)");
-          hasCompletedRef.current = false;
-          triggerHaptic();
-          return "running";
-        }
-        return prevState;
-      });
+      showToast('Session bitirildi — ' + result.elapsed + ' dk loglandı');
     }
-  }, [isFaceDown]);
+  }, [endSession, showToast]);
 
-  useEffect(() => {
-    if (timerState === "running") {
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            setTimerState("idle");
-            if (!hasCompletedRef.current) {
-              triggerCompletionFeedback();
-              hasCompletedRef.current = true;
-            }
-            return initialTime;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+  // Kart tap
+  const handleCardTap = useCallback(() => {
+    if (!isRunning) {
+      startSession();
+      triggerHaptic();
+      setFocusMode('tap');          // → FocusScreen (pomodoro)
+      showToast('Odak başladı!');
+    } else if (focusMode === 'tap') {
+      setFocusMode('none');         // geri dön
     } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      setFocusMode('tap');          // tekrar aç
     }
+  }, [isRunning, focusMode, startSession, showToast]);
 
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, [timerState, initialTime]);
-
-  const triggerHaptic = () => {
-    if (Platform.OS === "web") return;
-
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {
-      console.log("Haptics not available, using vibration");
-      Vibration.vibrate(100);
-    }
-  };
-
-  const triggerCompletionFeedback = () => {
-    if (Platform.OS === "web") return;
-
-    try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setTimeout(() => Vibration.vibrate([0, 200, 100, 200]), 100);
-    } catch {
-      Vibration.vibrate([0, 200, 100, 200, 100, 200]);
-    }
-  };
-
-  const handleReset = () => {
-    setTimeLeft(initialTime);
-    setTimerState("idle");
-    hasCompletedRef.current = false;
+  // Duraklat
+  const handlePause = useCallback(() => {
+    togglePause();
     triggerHaptic();
-  };
+    showToast(isPaused ? 'Devam ediyor' : 'Duraklatıldı');
+  }, [togglePause, isPaused, showToast]);
 
-  const adjustTime = (minutes) => {
-    const newTime = Math.max(1, Math.floor(initialTime / 60) + minutes) * 60;
-    setInitialTime(newTime);
-    if (timerState === "idle") {
-      setTimeLeft(newTime);
-    }
-  };
+  // Flip dedektörü
+  useFlipDetector({
+    enabled: true,
+    onFlipDown: useCallback(() => {
+      if (!isRunning) {
+        startSession();
+        triggerHaptic();
+        setFocusMode('flip');       // → FlipFocusMode (siyah, minimal)
+        showToast('Telefon çevrildi — odak başladı!');
+      }
+    }, [isRunning, startSession, showToast]),
+    onFlipUp: useCallback(() => {
+      if (isRunning) {
+        handleEnd();                // session biter, her iki mod da kapanır
+      }
+    }, [isRunning, handleEnd]),
+  });
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  };
+  useTimer({ onComplete: handleComplete });
 
-  if (timerState === "running") {
-    return (
-      <View style={styles.amoledContainer}>
-        <StatusBar style="light" />
-        <Text style={styles.amoledTimer}>{formatTime(timeLeft)}</Text>
-        <Text style={styles.amoledHint}>Focus Mode</Text>
-      </View>
-    );
-  }
+  const toastTranslate = toastAnim.interpolate({
+    inputRange: [0, 1], outputRange: [80, 0],
+  });
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor={Colors.bg} />
 
-      <View style={styles.header}>
-        <Timer size={32} color="#6B8E7F" strokeWidth={2.5} />
-        <Text style={styles.title}>Flip to Focus</Text>
-      </View>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.logo}>
+            <Text style={styles.logoAccent}>flip</Text>
+            <Text style={styles.logoWhite}>2focus</Text>
+          </Text>
+          <View style={styles.streakBadge}>
+            <Text style={styles.streakFire}>🔥</Text>
+            <Text style={styles.streakText}>{streak} gün</Text>
+          </View>
+        </View>
 
-      <View style={styles.timerContainer}>
-        <Text style={styles.timer}>{formatTime(timeLeft)}</Text>
-
-        <View style={styles.statusContainer}>
-          <View
-            style={[
-              styles.statusDot,
-              timerState === "running" && styles.statusDotActive,
-            ]}
+        <View style={styles.section}>
+          <PhoneCard
+            isFlipped={isFlipped}
+            remainingSeconds={remainingSeconds}
+            selectedDuration={selectedDuration}
+            sessionNumber={sessionNumber}
+            onPress={handleCardTap}
           />
-          <Text style={styles.statusText}>
-            {timerState === "idle"
-              ? "Ready"
-              : timerState === "running"
-              ? "Focusing"
-              : "Paused"}
-          </Text>
         </View>
-      </View>
 
-      <View style={styles.controls}>
-        <TouchableOpacity
-          style={styles.timeButton}
-          onPress={() => adjustTime(-5)}
-          disabled={timerState !== "idle"}
-        >
-          <Minus size={24} color={timerState === "idle" ? "#6B8E7F" : "#CBD5E0"} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.resetButton, timerState === "idle" && styles.resetButtonDisabled]}
-          onPress={handleReset}
-          disabled={timerState === "idle"}
-        >
-          <RotateCcw size={24} color={timerState === "idle" ? "#CBD5E0" : "#FFFFFF"} />
-          <Text
-            style={[
-              styles.resetButtonText,
-              timerState === "idle" && styles.resetButtonTextDisabled,
-            ]}
-          >
-            Reset
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.timeButton}
-          onPress={() => adjustTime(5)}
-          disabled={timerState !== "idle"}
-        >
-          <Plus size={24} color={timerState === "idle" ? "#6B8E7F" : "#CBD5E0"} />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.instructionContainer}>
-        <View style={styles.instructionCard}>
-          <Text style={styles.instructionTitle}>How it works</Text>
-          <Text style={styles.instructionText}>
-            Flip your phone face down to start the timer
-          </Text>
-          <Text style={styles.instructionText}>Flip it back up to pause</Text>
+        <View style={styles.section}>
+          <DurationSelector
+            selected={selectedDuration}
+            onSelect={setDuration}
+            disabled={isRunning}
+          />
         </View>
-      </View>
 
-      {Platform.OS !== "web" && (
-        <View style={styles.debugContainer}>
-          <Text style={styles.debugText}>
-            z: {sensorData.z.toFixed(2)} {isFaceDown ? "📱" : "📲"}
-          </Text>
+        <View style={styles.section}>
+          <SessionControls
+            isRunning={isRunning}
+            isPaused={isPaused}
+            onPause={handlePause}
+            onEnd={handleEnd}
+          />
         </View>
-      )}
+
+        <View style={styles.section}>
+          <StatsRow
+            focused={totalFocusedToday}
+            sessions={sessionsToday}
+            xp={totalXPToday}
+            totalXP={totalXP}
+            availableXP={availableXP}
+            onOpenStore={() => setStoreVisible(true)}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <SessionLog sessions={sessionLog} />
+        </View>
+      </ScrollView>
+
+      {/* Toast */}
+      <Animated.View
+        style={[styles.toast, { opacity: toastAnim, transform: [{ translateY: toastTranslate }] }]}
+        pointerEvents="none"
+      >
+        <Text style={styles.toastText}>{toastMsg.current}</Text>
+      </Animated.View>
+
+      {/* TAP MODU — pomodoro tam ekran */}
+      <FocusScreen
+        visible={focusMode === 'tap'}
+        remainingSeconds={remainingSeconds}
+        selectedDuration={selectedDuration}
+        sessionNumber={sessionNumber}
+        isPaused={isPaused}
+        onPause={handlePause}
+        onEnd={handleEnd}
+      />
+
+      {/* FLIP MODU — minimal siyah ekran */}
+      <FlipFocusMode
+        visible={focusMode === 'flip'}
+        remainingSeconds={remainingSeconds}
+        selectedDuration={selectedDuration}
+        onEnd={handleEnd}
+      />
+
+      <XPStore visible={storeVisible} onClose={() => setStoreVisible(false)} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: "#F7F9F4",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 60,
-    paddingBottom: 40,
-    paddingHorizontal: 20,
+    backgroundColor: Colors.bg,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 32 : 52,
   },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 20, paddingBottom: 56 },
   header: {
-    alignItems: "center",
-    gap: 12,
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 20,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#4A5568",
-    letterSpacing: -0.5,
+  logo: { fontSize: 20, fontWeight: '800', letterSpacing: -0.5 },
+  logoAccent: { color: Colors.accent, fontSize: 20, fontWeight: '800' },
+  logoWhite:  { color: Colors.text,   fontSize: 20, fontWeight: '800' },
+  streakBadge: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderWidth: 0.5, borderColor: Colors.border2,
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
   },
-  timerContainer: {
-    alignItems: "center",
-    gap: 20,
-    marginTop: -40,
+  streakFire: { fontSize: 13, marginRight: 5 },
+  streakText: { fontSize: 12, color: Colors.textMuted, fontWeight: '600' },
+  section: { marginBottom: 16 },
+  toast: {
+    position: 'absolute', bottom: 36, alignSelf: 'center',
+    backgroundColor: Colors.surface2,
+    borderWidth: 0.5, borderColor: Colors.border2,
+    borderRadius: 12, paddingHorizontal: 20, paddingVertical: 11,
+    maxWidth: '88%', zIndex: 100,
   },
-  timer: {
-    fontSize: 92,
-    fontWeight: "700",
-    color: "#6B8E7F",
-    letterSpacing: -2,
-    fontVariant: ["tabular-nums"],
-  },
-  statusContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#CBD5E0",
-  },
-  statusDotActive: {
-    backgroundColor: "#A4C3B2",
-  },
-  statusText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#718096",
-  },
-  controls: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 20,
-    marginTop: 20,
-  },
-  timeButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  resetButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: "#A4C3B2",
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 30,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  resetButtonDisabled: {
-    backgroundColor: "#E2E8F0",
-  },
-  resetButtonText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-  resetButtonTextDisabled: {
-    color: "#CBD5E0",
-  },
-  instructionContainer: {
-    width: "100%",
-    marginTop: 20,
-  },
-  instructionCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  instructionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#4A5568",
-    marginBottom: 12,
-  },
-  instructionText: {
-    fontSize: 15,
-    color: "#718096",
-    lineHeight: 22,
-    marginBottom: 6,
-  },
-  debugContainer: {
-    marginTop: 20,
-  },
-  debugText: {
-    fontSize: 12,
-    color: "#A0AEC0",
-    fontWeight: "500",
-  },
-  amoledContainer: {
-    flex: 1,
-    backgroundColor: "#000000",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 20,
-  },
-  amoledTimer: {
-    fontSize: 64,
-    fontWeight: "300",
-    color: "#404040",
-    letterSpacing: -1,
-    fontVariant: ["tabular-nums"],
-  },
-  amoledHint: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#303030",
-    letterSpacing: 1,
-    textTransform: "uppercase",
+  toastText: {
+    fontSize: 13, color: Colors.text,
+    fontWeight: '500', textAlign: 'center',
   },
 });

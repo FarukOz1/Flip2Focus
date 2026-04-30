@@ -1,33 +1,28 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
-
-const queryClient = new QueryClient();
-
-function RootLayoutNav() {
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="+not-found" />
-    </Stack>
-  );
-}
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { View } from 'react-native';
+import { useSessionStore } from '../store/sessionStore';
+import { Colors } from '../constants/colors';
 
 export default function RootLayout() {
+  const hydrate = useSessionStore((s) => s.hydrate);
+
   useEffect(() => {
-    SplashScreen.hideAsync();
+    hydrate();
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView>
-        <RootLayoutNav />
-      </GestureHandlerRootView>
-    </QueryClientProvider>
+    <View style={{ flex: 1, backgroundColor: Colors.bg }}>
+      <StatusBar style="light" />
+      <Stack
+        initialRouteName="splash"
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: Colors.bg },
+          animation: 'fade',
+        }}
+      />
+    </View>
   );
 }

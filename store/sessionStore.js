@@ -55,6 +55,11 @@ export const useSessionStore = create((set, get) => ({
   // Açılan ödüller
   unlockedRewards: [],
 
+  // Kişiselleştirme
+  activeTheme: 'default',
+  activeSound: null,
+  activeBadge: null,
+
   // Session log
   sessionLog: [],
 
@@ -188,6 +193,42 @@ export const useSessionStore = create((set, get) => ({
     return totalXP - spentXP;
   },
 
+  // ── Kişiselleştirme aksiyonları ────────────────────────────
+  setTheme: (themeId) => {
+    set({ activeTheme: themeId });
+    get().persist();
+  },
+
+  setActiveSound: (soundId) => {
+    set({ activeSound: soundId });
+    get().persist();
+  },
+
+  setActiveBadge: (badgeId) => {
+    set({ activeBadge: badgeId });
+    get().persist();
+  },
+
+  // ── Geliştirici aksiyonları ─────────────────────────────────
+  devAddXP: (amount) => {
+    const { totalXP } = get();
+    set({ totalXP: totalXP + amount });
+    get().persist();
+  },
+
+  devRemoveXP: (amount) => {
+    const { totalXP, spentXP } = get();
+    // mevcut XP'nin altına inemez (satın alınanları korur)
+    const newTotal = Math.max(spentXP, totalXP - amount);
+    set({ totalXP: newTotal });
+    get().persist();
+  },
+
+  devResetRewards: () => {
+    set({ spentXP: 0, unlockedRewards: [] });
+    get().persist();
+  },
+
   // Persist
   persist: async () => {
     const s = get();
@@ -200,6 +241,9 @@ export const useSessionStore = create((set, get) => ({
         totalXP: s.totalXP,
         spentXP: s.spentXP,
         unlockedRewards: s.unlockedRewards,
+        activeTheme: s.activeTheme,
+        activeSound: s.activeSound,
+        activeBadge: s.activeBadge,
         sessionLog: s.sessionLog,
         sessionNumber: s.sessionNumber,
         totalFocusedToday: s.totalFocusedToday,
@@ -227,6 +271,9 @@ export const useSessionStore = create((set, get) => ({
         totalXP: d.totalXP ?? 0,
         spentXP: d.spentXP ?? 0,
         unlockedRewards: d.unlockedRewards ?? [],
+        activeTheme: d.activeTheme ?? 'default',
+        activeSound: d.activeSound ?? null,
+        activeBadge: d.activeBadge ?? null,
         sessionLog: d.sessionLog ?? [],
         sessionNumber: d.sessionNumber ?? 1,
         totalFocusedToday: isToday ? (d.totalFocusedToday ?? 0) : 0,

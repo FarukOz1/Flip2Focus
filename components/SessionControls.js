@@ -1,18 +1,20 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors } from '../constants/colors';
+import { useTheme } from '../hooks/useTheme';
 
 export function SessionControls({ isRunning, isPaused, onPause, onEnd }) {
+  const theme = useTheme();
   if (!isRunning) return <View />;
 
   return (
     <View style={styles.container}>
       <TouchableOpacity
-        style={[styles.btn, styles.btnPrimary]}
+        style={[styles.btn, { backgroundColor: theme.accentDim, borderColor: theme.accentBorder }]}
         onPress={onPause}
         activeOpacity={0.8}
       >
-        <Text style={styles.btnPrimaryText}>
+        <Text style={[styles.btnPrimaryText, { color: theme.accent }]}>
           {isPaused ? '▶  resume' : '⏸  pause'}
         </Text>
       </TouchableOpacity>
@@ -40,12 +42,7 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     marginHorizontal: 4,
   },
-  btnPrimary: {
-    backgroundColor: Colors.accentDim,
-    borderColor: Colors.accentBorder,
-  },
   btnPrimaryText: {
-    color: Colors.accent,
     fontSize: 13,
     fontWeight: '600',
   },

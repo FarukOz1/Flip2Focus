@@ -1,18 +1,15 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
+  View, Text, TouchableOpacity, StyleSheet,
+  TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Colors } from '../constants/colors';
+import { useTheme } from '../hooks/useTheme';
 
 const PRESETS = [5, 15, 25, 45, 60, 90];
 
 export function DurationSelector({ selected, onSelect, disabled }) {
+  const theme = useTheme();
   const [customMode, setCustomMode] = useState(false);
   const [customVal, setCustomVal] = useState('');
 
@@ -35,7 +32,7 @@ export function DurationSelector({ selected, onSelect, disabled }) {
           onPress={() => !disabled && setCustomMode(!customMode)}
           disabled={disabled}
         >
-          <Text style={[styles.customToggle, customMode && styles.customToggleActive]}>
+          <Text style={[styles.customToggle, customMode && { color: theme.accent }]}>
             {customMode ? 'presets' : '+ custom'}
           </Text>
         </TouchableOpacity>
@@ -45,7 +42,7 @@ export function DurationSelector({ selected, onSelect, disabled }) {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.customRow}>
             <TextInput
-              style={styles.customInput}
+              style={[styles.customInput, { color: theme.accent }]}
               placeholder="1–180"
               placeholderTextColor={Colors.textMuted}
               keyboardType="number-pad"
@@ -58,11 +55,11 @@ export function DurationSelector({ selected, onSelect, disabled }) {
             />
             <Text style={styles.customUnit}>dakika</Text>
             <TouchableOpacity
-              style={styles.customConfirm}
+              style={[styles.customConfirm, { backgroundColor: theme.accentDim, borderColor: theme.accentBorder }]}
               onPress={handleCustomSubmit}
               activeOpacity={0.8}
             >
-              <Text style={styles.customConfirmText}>Ayarla</Text>
+              <Text style={[styles.customConfirmText, { color: theme.accent }]}>Ayarla</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.quickRow}>
@@ -80,34 +77,36 @@ export function DurationSelector({ selected, onSelect, disabled }) {
         </KeyboardAvoidingView>
       ) : (
         <View style={styles.row}>
-          {PRESETS.map((mins, index) => (
-            <TouchableOpacity
-              key={mins}
-              style={[
-                styles.btn,
-                selected === mins && styles.btnActive,
-                index < PRESETS.length - 1 && styles.btnMargin,
-              ]}
-              onPress={() => onSelect(mins)}
-              disabled={disabled}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.btnText, selected === mins && styles.btnTextActive]}>
-                {mins}
-              </Text>
-              <Text style={[styles.btnSub, selected === mins && styles.btnSubActive]}>
-                min
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {PRESETS.map((mins, index) => {
+            const isActive = selected === mins;
+            return (
+              <TouchableOpacity
+                key={mins}
+                style={[
+                  styles.btn,
+                  isActive && { backgroundColor: theme.accentDim, borderColor: theme.accentBorder },
+                  index < PRESETS.length - 1 && styles.btnMargin,
+                ]}
+                onPress={() => onSelect(mins)}
+                disabled={disabled}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.btnText, isActive && { color: theme.accent }]}>
+                  {mins}
+                </Text>
+                <Text style={[styles.btnSub, isActive && { color: theme.accentText }]}>
+                  min
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
-      {/* Seçili süre göster */}
       {!isPreset && !customMode && (
         <View style={styles.selectedCustom}>
           <Text style={styles.selectedCustomText}>
-            Özel süre: <Text style={{ color: Colors.accent }}>{selected} dakika</Text>
+            Özel süre: <Text style={{ color: theme.accent }}>{selected} dakika</Text>
           </Text>
         </View>
       )}
@@ -123,22 +122,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   label: {
-    fontSize: 10,
-    letterSpacing: 2,
-    color: Colors.textMuted,
-    fontWeight: '600',
+    fontSize: 10, letterSpacing: 2,
+    color: Colors.textMuted, fontWeight: '600',
   },
   customToggle: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    fontWeight: '500',
+    fontSize: 11, color: Colors.textMuted, fontWeight: '500',
   },
-  customToggleActive: {
-    color: Colors.accent,
-  },
-  row: {
-    flexDirection: 'row',
-  },
+  row: { flexDirection: 'row' },
   btn: {
     flex: 1,
     backgroundColor: Colors.surface,
@@ -149,86 +139,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnMargin: { marginRight: 6 },
-  btnActive: {
-    backgroundColor: Colors.accentDim,
-    borderColor: 'rgba(200,245,66,0.4)',
-  },
   btnText: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    fontWeight: '700',
-    lineHeight: 16,
+    fontSize: 13, color: Colors.textMuted,
+    fontWeight: '700', lineHeight: 16,
   },
-  btnTextActive: { color: Colors.accent },
-  btnSub: {
-    fontSize: 9,
-    color: Colors.textDim,
-  },
-  btnSubActive: { color: 'rgba(200,245,66,0.5)' },
+  btnSub: { fontSize: 9, color: Colors.textDim },
 
-  // Custom mode
   customRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderWidth: 0.5,
-    borderColor: Colors.border2,
+    borderWidth: 0.5, borderColor: Colors.border2,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 14, paddingVertical: 10,
     marginBottom: 8,
   },
   customInput: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: Colors.accent,
-    minWidth: 60,
-    padding: 0,
+    fontSize: 28, fontWeight: '700',
+    minWidth: 60, padding: 0,
   },
   customUnit: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    marginLeft: 6,
-    flex: 1,
+    fontSize: 13, color: Colors.textMuted,
+    marginLeft: 6, flex: 1,
   },
   customConfirm: {
-    backgroundColor: Colors.accentDim,
-    borderWidth: 0.5,
-    borderColor: Colors.accentBorder,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    borderWidth: 0.5, borderRadius: 8,
+    paddingHorizontal: 14, paddingVertical: 7,
   },
-  customConfirmText: {
-    fontSize: 12,
-    color: Colors.accent,
-    fontWeight: '600',
-  },
-  quickRow: {
-    flexDirection: 'row',
-    marginBottom: 4,
-  },
+  customConfirmText: { fontSize: 12, fontWeight: '600' },
+  quickRow: { flexDirection: 'row', marginBottom: 4 },
   quickBtn: {
     flex: 1,
     backgroundColor: Colors.surface2,
-    borderRadius: 8,
-    paddingVertical: 7,
+    borderRadius: 8, paddingVertical: 7,
     alignItems: 'center',
-    borderWidth: 0.5,
-    borderColor: Colors.border,
+    borderWidth: 0.5, borderColor: Colors.border,
   },
   quickBtnMargin: { marginRight: 6 },
-  quickBtnText: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    fontWeight: '500',
-  },
-  selectedCustom: {
-    marginTop: 6,
-    paddingHorizontal: 4,
-  },
-  selectedCustomText: {
-    fontSize: 11,
-    color: Colors.textMuted,
-  },
+  quickBtnText: { fontSize: 12, color: Colors.textMuted, fontWeight: '500' },
+  selectedCustom: { marginTop: 6, paddingHorizontal: 4 },
+  selectedCustomText: { fontSize: 11, color: Colors.textMuted },
 });

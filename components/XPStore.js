@@ -10,7 +10,9 @@ import {
   StatusBar,
 } from 'react-native';
 import { Colors } from '../constants/colors';
+import { THEMES } from '../constants/themes';
 import { useSessionStore, XP_REWARDS } from '../store/sessionStore';
+import { useTheme } from '../hooks/useTheme';
 
 const CATEGORIES = [
   { key: 'all',     label: 'Tümü' },
@@ -23,13 +25,75 @@ const CATEGORIES = [
 export function XPStore({ visible, onClose }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [confirmReward, setConfirmReward] = useState(null);
+  const [devOpen, setDevOpen] = useState(false);
 
   const totalXP         = useSessionStore((s) => s.totalXP);
   const spentXP         = useSessionStore((s) => s.spentXP);
   const unlockedRewards = useSessionStore((s) => s.unlockedRewards);
   const unlockReward    = useSessionStore((s) => s.unlockReward);
+  const devAddXP        = useSessionStore((s) => s.devAddXP);
+  const devRemoveXP     = useSessionStore((s) => s.devRemoveXP);
+  const devResetRewards = useSessionStore((s) => s.devResetRewards);
+  const activeTheme     = useSessionStore((s) => s.activeTheme);
+  const activeSound     = useSessionStore((s) => s.activeSound);
+  const activeBadge     = useSessionStore((s) => s.activeBadge);
+  const setTheme        = useSessionStore((s) => s.setTheme);
+  const setActiveSound  = useSessionStore((s) => s.setActiveSound);
+  const setActiveBadge  = useSessionStore((s) => s.setActiveBadge);
 
+  const theme = useTheme();
   const availableXP = totalXP - spentXP;
+
+  const renderUnlockedAction = (reward) => {
+    if (reward.type === 'theme') {
+      const isActive = activeTheme === reward.id;
+      return (
+        <TouchableOpacity
+          style={[styles.actionBtn, isActive && { backgroundColor: theme.accentDim, borderColor: theme.accentBorder }]}
+          onPress={() => setTheme(isActive ? 'default' : reward.id)}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.actionBtnText, isActive && { color: theme.accent }]}>
+            {isActive ? '✓ Aktif' : 'Seç'}
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+    if (reward.type === 'sound') {
+      const isActive = activeSound === reward.id;
+      return (
+        <TouchableOpacity
+          style={[styles.actionBtn, isActive && { backgroundColor: theme.accentDim, borderColor: theme.accentBorder }]}
+          onPress={() => setActiveSound(isActive ? null : reward.id)}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.actionBtnText, isActive && { color: theme.accent }]}>
+            {isActive ? '♫ Aktif' : 'Seç'}
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+    if (reward.type === 'badge') {
+      const isActive = activeBadge === reward.id;
+      return (
+        <TouchableOpacity
+          style={[styles.actionBtn, isActive && { backgroundColor: theme.accentDim, borderColor: theme.accentBorder }]}
+          onPress={() => setActiveBadge(isActive ? null : reward.id)}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.actionBtnText, isActive && { color: theme.accent }]}>
+            {isActive ? '✓ Takıldı' : 'Tak'}
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+    // feature
+    return (
+      <View style={[styles.unlockedBadge, { backgroundColor: theme.accentDim, borderColor: theme.accentBorder }]}>
+        <Text style={[styles.unlockedBadgeText, { color: theme.accent }]}>⚡ Aktif</Text>
+      </View>
+    );
+  };
 
   const filtered = activeCategory === 'all'
     ? XP_REWARDS
@@ -70,7 +134,7 @@ export function XPStore({ visible, onClose }) {
         <View style={styles.balanceCard}>
           <View style={styles.balanceCol}>
             <Text style={styles.balanceLabel}>Mevcut XP</Text>
-            <Text style={styles.balanceValueAccent}>{availableXP}</Text>
+            <Text style={[styles.balanceValueAccent, { color: theme.accent }]}>{availableXP}</Text>
           </View>
           <View style={styles.balanceDivider} />
           <View style={styles.balanceCol}>
@@ -85,12 +149,12 @@ export function XPStore({ visible, onClose }) {
         </View>
 
         {/* XP kazanma ipuçları */}
-        <View style={styles.tipsCard}>
-          <Text style={styles.tipsTitle}>XP Nasıl Kazanılır?</Text>
-          <Text style={styles.tipsText}>
+        <View style={[styles.tipsCard, { backgroundColor: theme.accentDim, borderColor: theme.accentBorder }]}>
+          <Text style={[styles.tipsTitle, { color: theme.accent }]}>XP Nasıl Kazanılır?</Text>
+          <Text style={[styles.tipsText, { color: theme.accentText }]}>
             5 dk → 5 XP  ·  25 dk → 50 XP  ·  45 dk → 135 XP  ·  60 dk → 180 XP
           </Text>
-          <Text style={styles.tipsText}>Tamamlanan session = 2–3x bonus XP!</Text>
+          <Text style={[styles.tipsText, { color: theme.accentText }]}>Tamamlanan session = 2–3x bonus XP!</Text>
         </View>
 
         {/* Kategori filtresi */}
@@ -105,17 +169,69 @@ export function XPStore({ visible, onClose }) {
             return (
               <TouchableOpacity
                 key={cat.key}
-                style={[styles.catBtn, isActive && styles.catBtnActive]}
+                style={[
+                  styles.catBtn,
+                  isActive && { backgroundColor: theme.accentDim, borderColor: theme.accentBorder },
+                ]}
                 onPress={() => setActiveCategory(cat.key)}
                 activeOpacity={0.75}
               >
-                <Text style={[styles.catText, isActive && styles.catTextActive]}>
+                <Text style={[styles.catText, isActive && { color: theme.accent, fontWeight: '600' }]}>
                   {cat.label}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
+
+        {/* Geliştirici Paneli */}
+        <TouchableOpacity
+          style={styles.devToggle}
+          onPress={() => setDevOpen((v) => !v)}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.devToggleText}>🛠️ Geliştirici  {devOpen ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
+
+        {devOpen && (
+          <View style={styles.devPanel}>
+            <Text style={styles.devLabel}>XP Ekle</Text>
+            <View style={styles.devRow}>
+              {[50, 100, 500].map((amt) => (
+                <TouchableOpacity
+                  key={`add_${amt}`}
+                  style={styles.devBtnGreen}
+                  onPress={() => devAddXP(amt)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.devBtnTextGreen}>+{amt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={[styles.devLabel, { marginTop: 10 }]}>XP Çıkar</Text>
+            <View style={styles.devRow}>
+              {[50, 100].map((amt) => (
+                <TouchableOpacity
+                  key={`rem_${amt}`}
+                  style={styles.devBtnRed}
+                  onPress={() => devRemoveXP(amt)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.devBtnTextRed}>−{amt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={styles.devBtnReset}
+              onPress={devResetRewards}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.devBtnTextReset}>🔄 Tüm Alımları Sıfırla</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Ödül listesi */}
         <ScrollView
@@ -136,23 +252,24 @@ export function XPStore({ visible, onClose }) {
                   !canAfford && !unlocked && styles.rewardCardLocked,
                   i < filtered.length - 1 && styles.rewardCardMargin,
                 ]}
-                onPress={() => handleUnlock(reward)}
-                disabled={unlocked || !canAfford}
+                onPress={unlocked ? undefined : () => handleUnlock(reward)}
+                disabled={!unlocked && !canAfford}
                 activeOpacity={0.8}
               >
-                <Text style={styles.rewardIcon}>{reward.icon}</Text>
+                <View style={styles.iconWrap}>
+                  <Text style={styles.rewardIcon}>{reward.icon}</Text>
+                  {reward.type === 'theme' && THEMES[reward.id] && (
+                    <View style={[styles.themeDot, { backgroundColor: THEMES[reward.id].accent }]} />
+                  )}
+                </View>
                 <View style={styles.rewardInfo}>
-                  <Text style={[styles.rewardName, unlocked && styles.rewardNameUnlocked]}>
+                  <Text style={[styles.rewardName, unlocked && { color: theme.accent }]}>
                     {reward.name}
                   </Text>
                   <Text style={styles.rewardDesc}>{reward.desc}</Text>
                 </View>
                 <View style={styles.rewardRight}>
-                  {unlocked ? (
-                    <View style={styles.unlockedBadge}>
-                      <Text style={styles.unlockedBadgeText}>✓ Açık</Text>
-                    </View>
-                  ) : (
+                  {unlocked ? renderUnlockedAction(reward) : (
                     <View style={[styles.costBadge, !canAfford && styles.costBadgeLocked]}>
                       <Text style={[styles.costText, !canAfford && styles.costTextLocked]}>
                         {reward.cost} XP
@@ -187,11 +304,11 @@ export function XPStore({ visible, onClose }) {
                 <Text style={styles.confirmCancelText}>Vazgeç</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.confirmOk}
+                style={[styles.confirmOk, { backgroundColor: theme.accentDim, borderColor: theme.accentBorder }]}
                 onPress={confirmUnlock}
                 activeOpacity={0.8}
               >
-                <Text style={styles.confirmOkText}>Aç!</Text>
+                <Text style={[styles.confirmOkText, { color: theme.accent }]}>Aç!</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -372,11 +489,34 @@ const styles = StyleSheet.create({
   rewardCardLocked: {
     opacity: 0.6,
   },
+  iconWrap: {
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 32,
+  },
   rewardIcon: {
     fontSize: 26,
-    marginRight: 12,
-    minWidth: 32,
     textAlign: 'center',
+  },
+  themeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 3,
+  },
+  actionBtn: {
+    backgroundColor: Colors.surface2,
+    borderWidth: 0.5,
+    borderColor: Colors.border2,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  actionBtnText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: '600',
   },
   rewardInfo: {
     flex: 1,
@@ -430,6 +570,85 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.accent,
     fontWeight: '700',
+  },
+
+  // Dev panel
+  devToggle: {
+    marginHorizontal: 20,
+    marginBottom: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(255,200,0,0.08)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,200,0,0.3)',
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  devToggleText: {
+    fontSize: 12,
+    color: 'rgba(255,200,0,0.8)',
+    fontWeight: '600',
+  },
+  devPanel: {
+    marginHorizontal: 20,
+    marginBottom: 10,
+    backgroundColor: 'rgba(255,200,0,0.05)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,200,0,0.25)',
+    borderRadius: 12,
+    padding: 14,
+  },
+  devLabel: {
+    fontSize: 10,
+    color: 'rgba(255,200,0,0.6)',
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  devRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  devBtnGreen: {
+    backgroundColor: 'rgba(100,220,100,0.12)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(100,220,100,0.4)',
+    borderRadius: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+  },
+  devBtnTextGreen: {
+    color: '#6fdc6f',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  devBtnRed: {
+    backgroundColor: 'rgba(220,80,80,0.12)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(220,80,80,0.4)',
+    borderRadius: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+  },
+  devBtnTextRed: {
+    color: '#e06060',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  devBtnReset: {
+    marginTop: 10,
+    backgroundColor: 'rgba(180,120,0,0.12)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(180,120,0,0.35)',
+    borderRadius: 8,
+    paddingVertical: 9,
+    alignItems: 'center',
+  },
+  devBtnTextReset: {
+    color: 'rgba(255,180,50,0.85)',
+    fontSize: 12,
+    fontWeight: '600',
   },
 
   // Confirm modal

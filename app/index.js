@@ -1,11 +1,12 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  Platform, Animated, StatusBar, TouchableOpacity,
+  Platform, Animated, StatusBar,
 } from 'react-native';
 
 import { Colors } from '../constants/colors';
-import { useSessionStore } from '../store/sessionStore';
+import { useSessionStore, XP_REWARDS } from '../store/sessionStore';
+import { useTheme } from '../hooks/useTheme';
 import { useFlipDetector } from '../hooks/useFlipDetector';
 import { useTimer } from '../hooks/useTimer';
 import { useNotifications, sendSessionCompleteNotification } from '../hooks/useNotifications';
@@ -17,6 +18,7 @@ import { SessionLog } from '../components/SessionLog';
 import { XPStore } from '../components/XPStore';
 import { FocusScreen } from '../components/FocusScreen';       // tap modu
 import { FlipFocusMode } from '../components/FlipFocusMode';   // flip modu
+import { DiamondSparkles } from '../components/DiamondSparkles';
 
 const triggerHaptic = async (type = 'medium') => {
   try {
@@ -53,7 +55,11 @@ export default function HomeScreen() {
   const togglePause      = useSessionStore((s) => s.togglePause);
   const setDuration      = useSessionStore((s) => s.setDuration);
 
+  const activeBadge = useSessionStore((s) => s.activeBadge);
   const availableXP = totalXP - spentXP;
+
+  const theme = useTheme();
+  const activeBadgeIcon = activeBadge ? XP_REWARDS.find((r) => r.id === activeBadge)?.icon : null;
 
   // Hangi modda? 'none' | 'tap' | 'flip'
   const [focusMode, setFocusMode] = useState('none');
@@ -142,8 +148,10 @@ export default function HomeScreen() {
   });
 
   return (
-    <View style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.bg} />
+    <View style={[styles.safe, { backgroundColor: theme.bg }]}>
+      <StatusBar barStyle="light-content" backgroundColor={theme.bg} />
+      {/* Tema header glow */}
+      <View style={[styles.headerGlow, { backgroundColor: theme.headerGlow }]} />
 
       <ScrollView
         style={styles.scroll}
@@ -154,12 +162,19 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.logo}>
-            <Text style={styles.logoAccent}>flip</Text>
+            <Text style={[styles.logoAccent, { color: theme.accent }]}>flip</Text>
             <Text style={styles.logoWhite}>2focus</Text>
           </Text>
-          <View style={styles.streakBadge}>
-            <Text style={styles.streakFire}>🔥</Text>
-            <Text style={styles.streakText}>{streak} gün</Text>
+          <View style={styles.headerRight}>
+            {activeBadgeIcon && (
+              <View style={[styles.streakBadge, styles.badgePill]}>
+                <Text style={styles.badgeIcon}>{activeBadgeIcon}</Text>
+              </View>
+            )}
+            <View style={styles.streakBadge}>
+              <Text style={styles.streakFire}>🔥</Text>
+              <Text style={styles.streakText}>{streak} gün</Text>
+            </View>
           </View>
         </View>
 
@@ -233,6 +248,7 @@ export default function HomeScreen() {
         onEnd={handleEnd}
       />
 
+      <DiamondSparkles active={activeBadge === 'badge_diamond'} />
       <XPStore visible={storeVisible} onClose={() => setStoreVisible(false)} />
     </View>
   );
@@ -253,15 +269,28 @@ const styles = StyleSheet.create({
   logo: { fontSize: 20, fontWeight: '800', letterSpacing: -0.5 },
   logoAccent: { color: Colors.accent, fontSize: 20, fontWeight: '800' },
   logoWhite:  { color: Colors.text,   fontSize: 20, fontWeight: '800' },
+  headerRight: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
   streakBadge: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: Colors.surface,
     borderWidth: 0.5, borderColor: Colors.border2,
     borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
   },
+  badgePill: {
+    paddingHorizontal: 10,
+  },
+  badgeIcon: { fontSize: 16 },
   streakFire: { fontSize: 13, marginRight: 5 },
   streakText: { fontSize: 12, color: Colors.textMuted, fontWeight: '600' },
   section: { marginBottom: 16 },
+  headerGlow: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: 160,
+    pointerEvents: 'none',
+  },
   toast: {
     position: 'absolute', bottom: 36, alignSelf: 'center',
     backgroundColor: Colors.surface2,

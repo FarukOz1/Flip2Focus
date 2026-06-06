@@ -7,6 +7,8 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Colors } from '../constants/colors';
+import { useTheme } from '../hooks/useTheme';
+import { FlameBorderOverlay } from './FlameBorderOverlay';
 
 export function PhoneCard({
   isFlipped,
@@ -15,6 +17,7 @@ export function PhoneCard({
   sessionNumber,
   onPress,
 }) {
+  const theme = useTheme();
   const flipAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -54,6 +57,7 @@ export function PhoneCard({
           { transform: [{ rotateY: frontRotate }], backfaceVisibility: 'hidden' },
         ]}
       >
+        <FlameBorderOverlay />
         <View style={styles.phoneIconWrap}>
           <Text style={styles.phoneEmoji}>📱</Text>
         </View>
@@ -61,8 +65,8 @@ export function PhoneCard({
         <Text style={styles.frontSub}>
           Flip your phone face-down{'\n'}to start a focus session
         </Text>
-        <View style={styles.hintBadge}>
-          <Text style={styles.hintText}>↷  tap to flip & start</Text>
+        <View style={[styles.hintBadge, { backgroundColor: theme.accentDim, borderColor: theme.accentBorder }]}>
+          <Text style={[styles.hintText, { color: theme.accent }]}>↷  tap to flip & start</Text>
         </View>
       </Animated.View>
 
@@ -71,28 +75,34 @@ export function PhoneCard({
         style={[
           styles.face,
           styles.back,
-          { transform: [{ rotateY: backRotate }], backfaceVisibility: 'hidden' },
+          {
+            backgroundColor: theme.focusBg,
+            borderColor: theme.accentBorder,
+            transform: [{ rotateY: backRotate }],
+            backfaceVisibility: 'hidden',
+          },
         ]}
       >
-        <View style={styles.focusBadge}>
-          <View style={styles.pulseDot} />
-          <Text style={styles.focusBadgeText}>DEEP FOCUS</Text>
+        <FlameBorderOverlay />
+        <View style={[styles.focusBadge, { backgroundColor: theme.accentFaint, borderColor: theme.accentBorder }]}>
+          <View style={[styles.pulseDot, { backgroundColor: theme.accent }]} />
+          <Text style={[styles.focusBadgeText, { color: theme.accent }]}>DEEP FOCUS</Text>
         </View>
 
         <View style={styles.timerBlock}>
-          <Text style={styles.timerLabel}>TIME FOCUSED</Text>
-          <Text style={styles.timerTime}>{timeStr}</Text>
-          <Text style={styles.sessionLabel}>session {sessionNumber}</Text>
+          <Text style={[styles.timerLabel, { color: theme.accentText }]}>TIME FOCUSED</Text>
+          <Text style={[styles.timerTime, { color: theme.accent }]}>{timeStr}</Text>
+          <Text style={[styles.sessionLabel, { color: theme.accentText }]}>session {sessionNumber}</Text>
         </View>
 
         <View style={styles.progressBlock}>
-          <View style={styles.progressBg}>
-            <View style={[styles.progressFg, { width: progressPct + '%' }]} />
+          <View style={[styles.progressBg, { backgroundColor: theme.accentFaint }]}>
+            <View style={[styles.progressFg, { width: progressPct + '%', backgroundColor: theme.accent }]} />
           </View>
-          <Text style={styles.progressPct}>{progressPct}%</Text>
+          <Text style={[styles.progressPct, { color: theme.accentText }]}>{progressPct}%</Text>
         </View>
 
-        <Text style={styles.backHint}>tap to end session</Text>
+        <Text style={[styles.backHint, { color: theme.accentText }]}>tap to end session</Text>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -105,10 +115,7 @@ const styles = StyleSheet.create({
   },
   face: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -120,15 +127,12 @@ const styles = StyleSheet.create({
     borderColor: Colors.border2,
   },
   back: {
-    backgroundColor: '#0d1503',
     borderWidth: 1,
-    borderColor: Colors.accentBorder,
     justifyContent: 'space-between',
     paddingVertical: 22,
   },
   phoneIconWrap: {
-    width: 72,
-    height: 72,
+    width: 72, height: 72,
     backgroundColor: Colors.surface2,
     borderRadius: 18,
     borderWidth: 1.5,
@@ -139,104 +143,38 @@ const styles = StyleSheet.create({
   },
   phoneEmoji: { fontSize: 28 },
   frontTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.text,
-    textAlign: 'center',
-    marginBottom: 6,
+    fontSize: 22, fontWeight: '700',
+    color: Colors.text, textAlign: 'center', marginBottom: 6,
   },
   frontSub: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 14,
+    fontSize: 13, color: Colors.textMuted,
+    textAlign: 'center', lineHeight: 20, marginBottom: 14,
   },
   hintBadge: {
-    backgroundColor: Colors.accentDim,
-    borderWidth: 0.5,
-    borderColor: Colors.accentBorder,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    borderWidth: 0.5, borderRadius: 8,
+    paddingHorizontal: 14, paddingVertical: 7,
   },
-  hintText: {
-    fontSize: 12,
-    color: Colors.accent,
-    fontWeight: '500',
-  },
+  hintText: { fontSize: 12, fontWeight: '500' },
   focusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(200,245,66,0.1)',
-    borderWidth: 0.5,
-    borderColor: Colors.accentBorder,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 0.5, borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 6,
   },
-  pulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.accent,
-    marginRight: 6,
-  },
-  focusBadgeText: {
-    fontSize: 11,
-    color: Colors.accent,
-    letterSpacing: 1.5,
-    fontWeight: '600',
-  },
-  timerBlock: {
-    alignItems: 'center',
-  },
-  timerLabel: {
-    fontSize: 10,
-    letterSpacing: 2,
-    color: 'rgba(200,245,66,0.5)',
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  timerTime: {
-    fontSize: 64,
-    fontWeight: '800',
-    color: Colors.accent,
-    letterSpacing: -3,
-    lineHeight: 72,
-  },
-  sessionLabel: {
-    fontSize: 11,
-    color: 'rgba(200,245,66,0.4)',
-    marginTop: 2,
-  },
+  pulseDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+  focusBadgeText: { fontSize: 11, letterSpacing: 1.5, fontWeight: '600' },
+  timerBlock: { alignItems: 'center' },
+  timerLabel: { fontSize: 10, letterSpacing: 2, fontWeight: '600', marginBottom: 4 },
+  timerTime: { fontSize: 64, fontWeight: '800', letterSpacing: -3, lineHeight: 72 },
+  sessionLabel: { fontSize: 11, marginTop: 2 },
   progressBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    paddingHorizontal: 8,
+    flexDirection: 'row', alignItems: 'center',
+    width: '100%', paddingHorizontal: 8,
   },
   progressBg: {
-    flex: 1,
-    height: 3,
-    backgroundColor: 'rgba(200,245,66,0.1)',
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginRight: 10,
+    flex: 1, height: 3, borderRadius: 2,
+    overflow: 'hidden', marginRight: 10,
   },
-  progressFg: {
-    height: '100%',
-    backgroundColor: Colors.accent,
-    borderRadius: 2,
-  },
-  progressPct: {
-    fontSize: 11,
-    color: 'rgba(200,245,66,0.5)',
-    minWidth: 30,
-    textAlign: 'right',
-  },
-  backHint: {
-    fontSize: 11,
-    color: 'rgba(200,245,66,0.35)',
-  },
+  progressFg: { height: '100%', borderRadius: 2 },
+  progressPct: { fontSize: 11, minWidth: 30, textAlign: 'right' },
+  backHint: { fontSize: 11 },
 });
